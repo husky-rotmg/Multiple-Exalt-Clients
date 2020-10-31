@@ -1,0 +1,1 @@
+start "" powershell.exe -WindowStyle Hidden -ExecutionPolicy ByPass -File "Run Exalt Plain.ps1" %*
