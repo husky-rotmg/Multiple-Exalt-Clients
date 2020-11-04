@@ -1,3 +1,3 @@
 ﻿. ./RunExaltAsUser.ps1
 
-& RunExaltAsUser @args
+& RunExalt @args

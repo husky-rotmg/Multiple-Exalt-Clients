@@ -1,1 +1,1 @@
-start "" powershell.exe -WindowStyle Hidden -ExecutionPolicy ByPass -File "Run Exalt Plain.ps1" %*
+start "" /b cmd /c powershell.exe -WindowStyle Hidden -ExecutionPolicy ByPass -Command "& { . .\RunExaltAsUser.ps1; RunExalt %* }"

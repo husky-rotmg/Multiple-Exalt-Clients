@@ -1,0 +1,1 @@
+start "" /b cmd /c powershell.exe -WindowStyle Hidden -ExecutionPolicy ByPass -Command "& { . .\RunExaltAsUser.ps1; RunExalt -File 'accounts.ini' }"
