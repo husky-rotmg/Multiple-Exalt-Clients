@@ -102,7 +102,7 @@ Function RunExaltFromList
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Select an Account'
-    $form.Size = New-Object System.Drawing.Size(300, 430)
+    $form.Size = New-Object System.Drawing.Size(295, 438)
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
     $form.MaximizeBox = $false
