@@ -17,6 +17,7 @@ Function RunExalt
         RunExaltAsUser -Username $Username -Password $Password -B64P $B64P
     }
 }
+
 Function RunExaltAsUser
 {
     [CmdletBinding()]
@@ -25,39 +26,23 @@ Function RunExaltAsUser
         $Password,
         $B64P
     )
-
-    Write-Host "Username $Username"
-    Write-Host "Password $Password"
-    Write-Host "B64P $B64P"
-
     Add-Type -AssemblyName PresentationFramework
 
-    #If a password was supplied, immediately convert to secure string
-    If (-not([string]::IsNullOrWhiteSpace($Password)))
+    #If a password was not supplied, ask for it
+    If ([string]::IsNullOrWhiteSpace($Password))
     {
-        $Password = ConvertTo-SecureString $Password -AsPlainText -Force
-    }
-    Else
-    {
-        $credentials = Get-Credential -Message "Enter your RotMG Exalt credentials." -UserName $Username
-        
-        #If the username is empty or the password was truly empty, error out
-        If ([string]::IsNullOrWhiteSpace($credentials.UserName) -or $credentials.Password.Length -eq 0)
-        {
-            [System.Windows.MessageBox]::Show('You require both a username and a password to log in.', 'Invalid Credentials', 'OK', 'Error')
-            return
-        }
+        $credentials = PromptNewCredentials -base64 $B64P -Username $Username
         $Username = $credentials.UserName
         $Password = $credentials.Password
     }
 
     try {
         $encoded_username=[Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($Username))
+        $encoded_password = $Password
         #Convert secure string encoded password to base64 string
-        $encoded_password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password))
         If (-not($B64P)) {
-            $encoded_password = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($encoded_password))
-        }
+            $encoded_password = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($Password))
+        } 
             
     } catch {
         [System.Windows.MessageBox]::Show("There was an issue converting your credentials.`n$_", "Credential Conversion Error", "OK", "Error")
@@ -65,7 +50,7 @@ Function RunExaltAsUser
     }
 
     $exalt_args="data:{platform:Deca,password:$encoded_password,guid:$encoded_username,env:4}"
-
+    Write-Host $exalt_args
     Start-Process -FilePath "$env:USERPROFILE\Documents\RealmOfTheMadGod\Production\RotMG Exalt.exe" -ArgumentList $exalt_args
 }
 
@@ -247,7 +232,8 @@ Function SaveSettings
     }
 }
 
-function Get-IniFile {
+function Get-IniFile 
+{
     <#
     .SYNOPSIS
     Read an ini file.
@@ -317,7 +303,7 @@ function Get-IniFile {
             continue
         }
 
-        "^(.+?)\s*=\s*(.*)$" {
+        "^([^=]+?)\s*=\s*(.*)$" {
             # Key
             if (!($section)) {
                 $section = $anonymous
@@ -332,9 +318,8 @@ function Get-IniFile {
     return $ini
 }
 
-
-
-function New-IniContent {
+function New-IniContent 
+{
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline)] [hashtable] $data,
