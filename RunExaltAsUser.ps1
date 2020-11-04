@@ -102,22 +102,22 @@ Function RunExaltFromList
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Select an Account'
-    $form.Size = New-Object System.Drawing.Size(300, 430)
+    $form.Size = New-Object System.Drawing.Size(287, 430)
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
 
     $btnConfirm = New-Object System.Windows.Forms.Button
-    $btnConfirm.Location = New-Object System.Drawing.Point(10, 350)
+    $btnConfirm.Location = New-Object System.Drawing.Point(10, 370)
     $btnConfirm.Size = New-Object System.Drawing.Size(75, 23)
-    $btnConfirm.Text = "Confirm"
+    $btnConfirm.Text = "Login"
     $btnConfirm.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $form.AcceptButton = $btnConfirm
     $form.Controls.Add($btnConfirm)
 
     $btnCancel = New-Object System.Windows.Forms.Button
-    $btnCancel.Location = New-Object System.Drawing.Point(195, 350)
+    $btnCancel.Location = New-Object System.Drawing.Point(195, 370)
     $btnCancel.Size = New-Object System.Drawing.Size(75, 23)
     $btnCancel.Text = 'Cancel'
     $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
@@ -125,7 +125,7 @@ Function RunExaltFromList
     $form.Controls.Add($btnCancel)
 
     $btnAdd = New-Object System.Windows.Forms.Button
-    $btnAdd.Location = New-Object System.Drawing.Point(10, 320)
+    $btnAdd.Location = New-Object System.Drawing.Point(10, 325)
     $btnAdd.Size = New-Object System.Drawing.Size(75, 23)
     $btnAdd.Text = 'Add'
     $btnAdd.Add_Click({
@@ -139,19 +139,21 @@ Function RunExaltFromList
     $form.Controls.Add($btnAdd)
 
     $btnRemove = New-Object System.Windows.Forms.Button
-    $btnRemove.Location = New-Object System.Drawing.Point(195, 320)
+    $btnRemove.Location = New-Object System.Drawing.Point(195, 325)
     $btnRemove.Size = New-Object System.Drawing.Size(75, 23)
     $btnRemove.Text = 'Remove'
     $btnRemove.Add_Click({
-        $selected = $lbAccounts.SelectedItem
-        $lbAccounts.Items.Remove($selected)
-        $data.Accounts.Remove($selected)
+        foreach ($selected in @($lbAccounts.SelectedItems))
+        {
+            $lbAccounts.Items.Remove($selected)
+            $data.Accounts.Remove($selected)
+        }            
         SaveSettings -Data $data -File $File
     })
     $form.Controls.Add($btnRemove)
 
     $btnEdit = New-Object System.Windows.Forms.Button
-    $btnEdit.Location = New-Object System.Drawing.Point(100, 320)
+    $btnEdit.Location = New-Object System.Drawing.Point(100, 325)
     $btnEdit.Size = New-Object System.Drawing.Size(75, 23)
     $btnEdit.Text = 'Edit'
     $btnEdit.Add_Click({
@@ -183,7 +185,7 @@ Function RunExaltFromList
     $lbAccounts.Size = New-Object System.Drawing.Size(260, 20)
     $lbAccounts.Height = 280
     $lbAccounts.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
-
+    $lbAccounts.Sorted = $true
 
     $lbAccounts.Items.AddRange($data.Accounts.Keys)
 
