@@ -1,5 +1,5 @@
 ﻿
-$RUNNING_VERS = [Version]"1.3"
+$running_vers = [Version]"1.5"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName PresentationFramework
@@ -37,6 +37,10 @@ Function RunExaltAsUser
     If ([string]::IsNullOrWhiteSpace($Password))
     {
         $credentials = PromptNewCredentials -base64 $B64P -Username $Username
+        if (!$credentials)
+        {
+            return
+        }
         $Username = $credentials.UserName
         $Password = $credentials.Password
     }
@@ -55,7 +59,6 @@ Function RunExaltAsUser
     }
 
     $exalt_args="data:{platform:Deca,password:$encoded_password,guid:$encoded_username,env:4}"
-    Write-Host $exalt_args
     Start-Process -FilePath "$env:USERPROFILE\Documents\RealmOfTheMadGod\Production\RotMG Exalt.exe" -ArgumentList $exalt_args
 }
 
@@ -102,9 +105,12 @@ Function RunExaltFromList
     $btnAdd.Add_Click({
         try {
             $creds = PromptNewCredentials -base64 $base64
-            $lbAccounts.Items.Add($creds.Username)
-            $data.Accounts.Add($creds.Username, $creds.Password)
-            Save-Settings -Data $data -File $File
+            if ($creds)
+            {
+                $lbAccounts.Items.Add($creds.Username)
+                $data.Accounts.Add($creds.Username, $creds.Password)
+                Save-Settings -Data $data -File $File
+            }
         } catch { }
     })
     $form.Controls.Add($btnAdd)
@@ -134,11 +140,14 @@ Function RunExaltFromList
         }
         try {
             $creds = PromptNewCredentials -Username $selected -base64 $base64
-            $lbAccounts.Items.Remove($selected)
-            $lbAccounts.Items.Add($creds.Username)
-            $data.Accounts.Remove($selected)
-            $data.Accounts.Add($creds.Username, $creds.Password)
-            Save-Settings -Data $data -File $File
+            if ($creds)
+            {
+                $lbAccounts.Items.Remove($selected)
+                $lbAccounts.Items.Add($creds.Username)
+                $data.Accounts.Remove($selected)
+                $data.Accounts.Add($creds.Username, $creds.Password)
+                Save-Settings -Data $data -File $File
+            }
         } catch { }
         
     })
@@ -157,8 +166,10 @@ Function RunExaltFromList
     $lbAccounts.Height = 260
     $lbAccounts.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
     $lbAccounts.Sorted = $true
-
-    $lbAccounts.Items.AddRange($data.Accounts.Keys)
+    if ($data.Accounts.Keys)
+    {
+        $lbAccounts.Items.AddRange($data.Accounts.Keys)
+    }
     $form.Controls.Add($lbAccounts)
 
     $chkRemember = New-Object System.Windows.Forms.CheckBox
@@ -210,7 +221,10 @@ Function PromptNewCredentials
     param($base64,$Username)
 
     $credentials = Get-Credential -Message "Enter your RotMG Exalt credentials." -UserName $Username
-        
+    if (!$credentials)
+    {
+        return $null
+    }    
     #If the username is empty or the password was truly empty, error out
     If ([string]::IsNullOrWhiteSpace($credentials.UserName) -or $credentials.Password.Length -eq 0)
     {
@@ -253,12 +267,15 @@ Function Get-Settings
 
     try {
         $latest = ConvertFrom-Json $(Invoke-WebRequest -Uri "https://api.github.com/repos/husky-rotmg/multiple-exalt-clients/releases/latest").Content
-        $latest = [Version]($latest.tag_name.substring(1))
-        if ($latest -gt $RUNNING_VERS -and $data.Settings.checkUpdates -ne $false)
+        $latest_vers = [Version]($latest.tag_name.substring(1))
+        $latest_body = $latest.body
+        $latest_title = $latest.name
+        $latest_url = $latest.html_url
+        if ($latest_vers -gt $running_vers -and $data.Settings.checkUpdates -ne $false)
         {
             $form = New-Object System.Windows.Forms.Form
             $form.Text = 'Updates Found'
-            $form.Size = New-Object System.Drawing.Size(295, 238)
+            $form.Size = New-Object System.Drawing.Size(290, 280)
             $form.StartPosition = 'CenterScreen'
             $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
             $form.MaximizeBox = $false
@@ -266,15 +283,71 @@ Function Get-Settings
 
             $chkAsk = New-Object System.Windows.Forms.CheckBox
             $chkAsk.Text = "Continue to ask when a new update is available?"
+            $chkAsk.Location = New-Object System.Drawing.Point(10, 180)
+            $chkAsk.MaximumSize = New-Object System.Drawing.Size(270, 0)
+            $chkAsk.AutoSize = $true
+            $chkAsk.Checked = $true
             $form.Controls.Add($chkAsk)
 
             $btnAccept = New-Object System.Windows.Forms.Button
-            $btnAccept.Location = New-Object System.Drawing.Point(10, 370)
+            $btnAccept.Location = New-Object System.Drawing.Point(10, 210)
             $btnAccept.Size = New-Object System.Drawing.Size(75, 23)
             $btnAccept.Text = "Update"
             $btnAccept.DialogResult = [System.Windows.Forms.DialogResult]::OK
             $form.AcceptButton = $btnAccept
             $form.Controls.Add($btnAccept)
+
+            $btnCancel = New-Object System.Windows.Forms.Button
+            $btnCancel.Location = New-Object System.Drawing.Point(190, 210)
+            $btnCancel.Size = New-Object System.Drawing.Size(75, 23)
+            $btnCancel.Text = "Cancel"
+            $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+            $form.CancelButton = $btnCancel
+            $form.Controls.Add($btnCancel)
+            $lblUpdate = New-Object System.Windows.Forms.Label
+            $lblUpdate.Location = New-Object System.Drawing.Point(10, 10)
+            $lblUpdate.MaximumSize = New-Object System.Drawing.Size(270, 0)
+            $lblUpdate.AutoSize = $true
+            $lblUpdate.Text = "There is a new version available. Would you like to update?"
+            
+            $lblVersions = New-Object System.Windows.Forms.Label
+            $lblVersions.Location = New-Object System.Drawing.Point(10, 40)
+            $lblVersions.MaximumSize = New-Object System.Drawing.Size(270, 0)
+            $lblVersions.AutoSize = $true
+            $lblVersions.Text = "Current = $running_vers, Latest = $latest_vers"
+            
+            $lblTitle = New-Object System.Windows.Forms.Label
+            $lblTitle.Location = New-Object System.Drawing.Point(10, 70)
+            $lblTitle.MaximumSize = New-Object System.Drawing.Size(270, 0)
+            $lblTitle.AutoSize = $true
+            $lblTitle.Font = New-Object System.Drawing.Font([System.Windows.Forms.Label]::DefaultFont, [System.Drawing.FontStyle]::Bold)
+            $lblTitle.Text = "$latest_title"
+            
+            $lblBody = New-Object System.Windows.Forms.TextBox
+            $lblBody.Location = New-Object System.Drawing.Point(10, 90)
+            $lblBody.Size = New-Object System.Drawing.Size(255, 85)
+            $lblBody.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+            $lblBody.WordWrap = $true
+            $lblBody.Multiline = $true
+            $lblBody.ReadOnly = $true
+            $lblBody.Text = "$latest_body"
+
+            $form.Controls.Add($lblUpdate)
+            $form.Controls.Add($lblVersions)
+            $form.Controls.Add($lblTitle)
+            $form.Controls.Add($lblBody)
+
+            $form.Topmost = $true
+            $result = $form.ShowDialog()
+
+            $data.Settings.checkUpdates = $chkAsk.Checked
+            Save-Settings -Data $data -File $File
+
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK)
+            {
+                Start-Process -FilePath powershell.exe -WorkingDirectory $(Get-Location).Path -ArgumentList "-WindowStyle Hidden -ExecutionPolicy ByPass -Command `"& {. .\update.ps1; Update-MEC -Current $running_vers -Latest $latest_vers -File $File }`""
+                Exit 0
+            }
         }
     } catch { }
 
@@ -284,18 +357,7 @@ Function Save-Settings
 {
     param([Hashtable]$Data, [string]$File)
 
-    Set-Content -Path $File -Value ""
-    foreach ($section in $Data.Keys)
-    {
-        Add-Content -Path $File -Value "[$section]"
-        $section = $Data.Get_Item($section)
-        foreach ($key in $section.Keys)
-        {
-            $value = $section.Get_Item($key)
-            Add-Content -Path $File -Value "$key=$value"
-        }
-        Add-Content -Path $File -Value ""
-    }
+    Set-Content -Path $File -Value $($Data | New-IniContent)
 }
 
 function Get-IniFile 
