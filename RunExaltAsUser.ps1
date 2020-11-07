@@ -1,4 +1,10 @@
 ﻿
+$RUNNING_VERS = [Version]"1.3"
+
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName PresentationFramework
+Add-Type -AssemblyName System.Drawing
+
 Function RunExalt
 {
     param(
@@ -26,8 +32,7 @@ Function RunExaltAsUser
         $Password,
         $B64P
     )
-    Add-Type -AssemblyName PresentationFramework
-
+    
     #If a password was not supplied, ask for it
     If ([string]::IsNullOrWhiteSpace($Password))
     {
@@ -58,32 +63,13 @@ Function RunExaltFromList
 {
     param($File)
 
-    Add-Type -AssemblyName System.Windows.Forms
-
-    $data = $null
-    try 
-    {
-        $data = Get-IniFile $File
-    } 
-    catch
-    {
-        $data = @{
-            Settings = @{
-                base64="true"
-            };
-            Accounts = @{
-            };
-        }
-        SaveSettings -Data $data -File $File
-    }
+    $data = Get-Settings $File
     $base64 = $false
 
     if (-not($data.Settings -eq $null) -and -not($data.Settings.base64 -eq $null) -and $data.Settings.base64 -eq $true)
     {
         $base64 = $true
     }
-
-    Add-Type -AssemblyName System.Drawing
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Select an Account'
@@ -118,7 +104,7 @@ Function RunExaltFromList
             $creds = PromptNewCredentials -base64 $base64
             $lbAccounts.Items.Add($creds.Username)
             $data.Accounts.Add($creds.Username, $creds.Password)
-            SaveSettings -Data $data -File $File
+            Save-Settings -Data $data -File $File
         } catch { }
     })
     $form.Controls.Add($btnAdd)
@@ -133,7 +119,7 @@ Function RunExaltFromList
             $lbAccounts.Items.Remove($selected)
             $data.Accounts.Remove($selected)
         }            
-        SaveSettings -Data $data -File $File
+        Save-Settings -Data $data -File $File
     })
     $form.Controls.Add($btnRemove)
 
@@ -152,7 +138,7 @@ Function RunExaltFromList
             $lbAccounts.Items.Add($creds.Username)
             $data.Accounts.Remove($selected)
             $data.Accounts.Add($creds.Username, $creds.Password)
-            SaveSettings -Data $data -File $File
+            Save-Settings -Data $data -File $File
         } catch { }
         
     })
@@ -168,18 +154,49 @@ Function RunExaltFromList
     $lbAccounts = New-Object System.WIndows.Forms.ListBox
     $lbAccounts.Location = New-Object System.Drawing.Point(10, 40)
     $lbAccounts.Size = New-Object System.Drawing.Size(260, 20)
-    $lbAccounts.Height = 280
+    $lbAccounts.Height = 260
     $lbAccounts.SelectionMode = [System.Windows.Forms.SelectionMode]::MultiExtended
     $lbAccounts.Sorted = $true
 
     $lbAccounts.Items.AddRange($data.Accounts.Keys)
-
     $form.Controls.Add($lbAccounts)
+
+    $chkRemember = New-Object System.Windows.Forms.CheckBox
+    $chkRemember.Location = New-Object System.Drawing.Point(10, 290)
+    $chkRemember.Width = 260
+    if ([string]::IsNullOrWhiteSpace($data.Settings.remember)) {
+        $data.Settings.remember = "true"
+        Save-Settings -Data $data -File $File
+    }
+
+    $chkRemember.Text = "Remember previous selections?"
+    $chkRemember.Checked = $false
+    if ($data.Settings.remember -ne "False")
+    {
+        $chkRemember.Checked = $true
+        if ($data.Settings.previous) {
+            foreach ($name in $data.Settings.previous.split(" ")) {
+                $lbAccounts.SelectedItems.Add($name)
+            }
+        }
+    }
+    $chkRemember.Add_CheckStateChanged({
+        $data.Settings.remember = $chkRemember.Checked
+        Save-Settings -Data $data -File $File
+    })
+
+    $form.Controls.Add($chkRemember)
+
     $form.Topmost = $true
     $result = $form.ShowDialog()
 
     if ($result -eq [System.Windows.Forms.DialogResult]::OK)
     {
+        if ($data.Settings.remember)
+        {
+            $data.Settings.previous = $lbAccounts.SelectedItems
+            Save-Settings -Data $data -File $File
+        }
         foreach ($username in $lbAccounts.SelectedItems)
         {
             $password = $data.Accounts.Get_Item($username)
@@ -213,22 +230,71 @@ Function PromptNewCredentials
         Password = $Password
     }
 }
-
-Function SaveSettings
+Function Get-Settings
 {
-    param([Hashtable]$data, [string]$file)
-
-    Set-Content -Path $file -Value ""
-    foreach ($section in $data.Keys)
+    param($File)
+    $data = $null
+    try 
     {
-        Add-Content -Path $file -Value "[$section]"
-        $section = $data.Get_Item($section)
+        $data = Get-IniFile $File
+    } 
+    catch
+    {
+        $data = @{
+            Settings = @{
+                base64="true"
+                checkUpdates="true"
+            };
+            Accounts = @{
+            };
+        }
+        Save-Settings -Data $data -File $File
+    }
+
+    try {
+        $latest = ConvertFrom-Json $(Invoke-WebRequest -Uri "https://api.github.com/repos/husky-rotmg/multiple-exalt-clients/releases/latest").Content
+        $latest = [Version]($latest.tag_name.substring(1))
+        if ($latest -gt $RUNNING_VERS -and $data.Settings.checkUpdates -ne $false)
+        {
+            $form = New-Object System.Windows.Forms.Form
+            $form.Text = 'Updates Found'
+            $form.Size = New-Object System.Drawing.Size(295, 238)
+            $form.StartPosition = 'CenterScreen'
+            $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
+            $form.MaximizeBox = $false
+            $form.MinimizeBox = $false
+
+            $chkAsk = New-Object System.Windows.Forms.CheckBox
+            $chkAsk.Text = "Continue to ask when a new update is available?"
+            $form.Controls.Add($chkAsk)
+
+            $btnAccept = New-Object System.Windows.Forms.Button
+            $btnAccept.Location = New-Object System.Drawing.Point(10, 370)
+            $btnAccept.Size = New-Object System.Drawing.Size(75, 23)
+            $btnAccept.Text = "Update"
+            $btnAccept.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $form.AcceptButton = $btnAccept
+            $form.Controls.Add($btnAccept)
+        }
+    } catch { }
+
+    return $data
+}
+Function Save-Settings
+{
+    param([Hashtable]$Data, [string]$File)
+
+    Set-Content -Path $File -Value ""
+    foreach ($section in $Data.Keys)
+    {
+        Add-Content -Path $File -Value "[$section]"
+        $section = $Data.Get_Item($section)
         foreach ($key in $section.Keys)
         {
             $value = $section.Get_Item($key)
-            Add-Content -Path $file -Value "$key=$value"
+            Add-Content -Path $File -Value "$key=$value"
         }
-        Add-Content -Path $file -Value ""
+        Add-Content -Path $File -Value ""
     }
 }
 
