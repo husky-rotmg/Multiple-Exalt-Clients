@@ -1,5 +1,5 @@
 ﻿
-$running_vers = [Version]"1.5"
+$running_vers = [Version]"1.6"
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName PresentationFramework
